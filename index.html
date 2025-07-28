@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bus Boarding Sequence</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+
+        textarea {
+            width: 340px;
+            height: 100px;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #888;
+            padding: 8px 15px;
+        }
+
+        th {
+            background: #eee;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin: 10px 0;
+        }
+
+        #error {
+            color: red;
+            font-weight: bold;
+        }
+
+        .input-section {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .file-input {
+            margin: 10px 0;
+        }
+
+        .file-input input[type="file"] {
+            margin: 5px 0;
+        }
+
+        .or-divider {
+            text-align: center;
+            margin: 20px 0;
+            font-weight: bold;
+            color: #666;
+        }
+
+        .data-preview {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        .error-row {
+            background-color: #ffe6e6;
+            color: #d63031;
+        }
+
+        .valid-row {
+            background-color: #e6ffe6;
+        }
+
+        .preview-table {
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+
+        .status-legend {
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+        }
+
+        .legend-box {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
+        .error-legend { background-color: #ffe6e6; }
+        .valid-legend { background-color: #e6ffe6; }
+    </style>
+</head>
+
+<body>
+    <h2>Bus Boarding Sequence Generator</h2>
+    
+    <div class="input-section">
+        <h3>Option 1: Upload File</h3>
+        <div class="file-input">
+            <label for="fileInput">Choose file (CSV, TXT, or Excel):</label><br>
+            <input type="file" id="fileInput" accept=".csv,.txt,.xls,.xlsx" onchange="handleFileUpload(event)">
+            <br><small>Supported formats: CSV, TXT, Excel (.xls, .xlsx)</small>
+        </div>
+        <button onclick="processUploadedFile()">Upload & Process File</button>
+    </div>
+
+    <div class="or-divider">OR</div>
+
+    <div class="input-section">
+        <h3>Option 2: Manual Input</h3>
+        <p>
+            Enter booking data (Booking_ID,Seat1,Seat2,...):<br>
+            <small>Example:<br>101,A1,B1<br>102,C15,A10<br>103,D20</small>
+        </p>
+        <textarea id="inputData"></textarea><br>
+        <button onclick="submitData()">Generate Sequence</button>
+    </div>
+
+    <div id="error"></div>
+    
+    <div id="dataPreview" class="data-preview" style="display:none;">
+        <h3>Data Preview</h3>
+        <div class="status-legend">
+            <div class="legend-item">
+                <span class="legend-box valid-legend"></span>Valid rows (will be processed)
+            </div>
+            <div class="legend-item">
+                <span class="legend-box error-legend"></span>Error rows (will be ignored)
+            </div>
+        </div>
+        <div class="preview-table">
+            <table id="previewTable" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Line</th>
+                        <th>Booking_ID</th>
+                        <th>Seats</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div id="previewSummary"></div>
+        <button onclick="processValidData()" id="processValidBtn" style="display:none;">Process Valid Data Only</button>
+    </div>
+
+    <table id="resultTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>Seq</th>
+                <th>Booking_ID</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <script>
+        let uploadedFileContent = null;
+        let parsedData = [];
+        let validBookings = [];
+
+        function isValidSeatLabel(seat) {
+            return /^[A-Za-z]+\d+$/.test(seat);
+        }
+
+        function isValidBookingID(bookingID) {
+            return /^[A-Za-z0-9_-]+$/.test(bookingID);
+        }
+
+        function validateSingleBooking(booking, lineNumber, allBookingIds, allSeats) {
+            const errors = [];
+            
+            // Check Booking_ID
+            if (!booking.Booking_ID || !isValidBookingID(booking.Booking_ID)) {
+                errors.push('Invalid Booking_ID format');
+            } else if (allBookingIds.has(booking.Booking_ID)) {
+                errors.push('Duplicate Booking_ID');
+            }
+            
+            // Check seats
+            if (!booking.Seats || booking.Seats.length === 0) {
+                errors.push('No seats provided');
+            } else {
+                const bookingSeats = new Set();
+                for (const seat of booking.Seats) {
+                    if (!isValidSeatLabel(seat)) {
+                        errors.push(`Invalid seat format: ${seat}`);
+                    } else if (bookingSeats.has(seat)) {
+                        errors.push(`Duplicate seat in booking: ${seat}`);
+                    } else if (allSeats.has(seat)) {
+                        errors.push(`Seat already assigned: ${seat}`);
+                    } else {
+                        const row = parseInt(seat.match(/\d+/)[0]);
+                        if (isNaN(row) || row < 1 || row > 40) {
+                            errors.push(`Invalid row number in seat: ${seat}`);
+                        }
+                    }
+                    bookingSeats.add(seat);
+                }
+            }
+            
+            return errors;
+        }
+
+        function validateBookings(bookings) {
+            const bookingIds = new Set();
+            const allSeats = new Set();
+            const MAX_ROW = 40;
+            for (let i = 0; i < bookings.length; i++) {
+                const b = bookings[i];
+                if (!b.Booking_ID) return `Missing Booking_ID on line ${i + 1}`;
+                if (bookingIds.has(b.Booking_ID)) return `Duplicate Booking_ID: ${b.Booking_ID}`;
+                bookingIds.add(b.Booking_ID);
+                if (!b.Seats || b.Seats.length === 0) return `No seats for Booking_ID ${b.Booking_ID}`;
+                for (let seat of b.Seats) {
+                    if (!isValidSeatLabel(seat)) return `Invalid seat label: ${seat}`;
+                    if (allSeats.has(seat)) return `Seat ${seat} assigned to multiple bookings`;
+                    allSeats.add(seat);
+                    const row = parseInt(seat.match(/\d+/)[0]);
+                    if (isNaN(row) || row < 1 || row > MAX_ROW) return `Invalid row number in seat: ${seat}`;
+                }
+            }
+            return null; // All good
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const fileName = file.name.toLowerCase();
+            const fileExtension = fileName.split('.').pop();
+
+            if (fileExtension === 'csv' || fileExtension === 'txt') {
+                // Handle CSV/TXT files
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedFileContent = e.target.result;
+                    document.getElementById('error').innerText = `File "${file.name}" loaded successfully. Click "Upload & Process File" to continue.`;
+                    document.getElementById('error').style.color = 'green';
+                };
+                reader.readAsText(file);
+            } else if (fileExtension === 'xls' || fileExtension === 'xlsx') {
+                // For Excel files, we'll need to use a library like SheetJS
+                document.getElementById('error').innerText = 'Excel files require SheetJS library. Please convert to CSV format or use manual input.';
+                document.getElementById('error').style.color = 'orange';
+            } else {
+                document.getElementById('error').innerText = 'Unsupported file format. Please use CSV, TXT, or Excel files.';
+                document.getElementById('error').style.color = 'red';
+            }
+        }
+
+        function parseCSVContent(content) {
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+            const allData = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                try {
+                    // Handle both comma and semicolon separated values
+                    let parts = line.includes(';') ? line.split(';') : line.split(',');
+                    parts = parts.map(p => p.trim().replace(/['"]/g, '')); // Remove quotes
+
+                    if (parts.length < 2) {
+                        throw new Error(`Invalid format: Expected Booking_ID,Seat1,Seat2,...`);
+                    }
+
+                    const Booking_ID = parts[0];
+                    const Seats = parts.slice(1).filter(seat => seat); // Remove empty seats
+
+                    if (!Booking_ID) {
+                        throw new Error(`Missing Booking_ID`);
+                    }
+
+                    if (Seats.length === 0) {
+                        throw new Error(`No seats found`);
+                    }
+
+                    allData.push({
+                        lineNumber: i + 1,
+                        originalLine: line,
+                        Booking_ID,
+                        Seats,
+                        isValid: true,
+                        errors: []
+                    });
+
+                } catch (error) {
+                    allData.push({
+                        lineNumber: i + 1,
+                        originalLine: line,
+                        Booking_ID: parts ? parts[0] : '',
+                        Seats: [],
+                        isValid: false,
+                        errors: [error.message]
+                    });
+                }
+            }
+
+            return allData;
+        }
+
+        function validateParsedData(allData) {
+            const allBookingIds = new Set();
+            const allSeats = new Set();
+            
+            // First pass: collect all valid booking IDs and seats for duplicate checking
+            allData.forEach(item => {
+                if (item.isValid && item.Booking_ID) {
+                    const errors = validateSingleBooking(item, item.lineNumber, new Set(), new Set());
+                    if (errors.length === 0) {
+                        allBookingIds.add(item.Booking_ID);
+                        item.Seats.forEach(seat => allSeats.add(seat));
+                    }
+                }
+            });
+
+            // Second pass: validate each item against the collected data
+            const usedBookingIds = new Set();
+            const usedSeats = new Set();
+            
+            allData.forEach(item => {
+                if (item.isValid) {
+                    const errors = validateSingleBooking(item, item.lineNumber, usedBookingIds, usedSeats);
+                    if (errors.length > 0) {
+                        item.isValid = false;
+                        item.errors = errors;
+                    } else {
+                        usedBookingIds.add(item.Booking_ID);
+                        item.Seats.forEach(seat => usedSeats.add(seat));
+                    }
+                }
+            });
+
+            return allData;
+        }
+
+        function displayDataPreview(allData) {
+            const tbody = document.querySelector('#previewTable tbody');
+            tbody.innerHTML = '';
+            
+            let validCount = 0;
+            let errorCount = 0;
+
+            allData.forEach(item => {
+                const row = document.createElement('tr');
+                row.className = item.isValid ? 'valid-row' : 'error-row';
+                
+                if (item.isValid) validCount++;
+                else errorCount++;
+
+                const seatsText = item.Seats.length > 0 ? item.Seats.join(', ') : 'None';
+                const statusText = item.isValid ? 'Valid' : item.errors.join('; ');
+
+                row.innerHTML = `
+                    <td>${item.lineNumber}</td>
+                    <td>${item.Booking_ID || 'N/A'}</td>
+                    <td>${seatsText}</td>
+                    <td>${statusText}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+
+            // Update summary
+            const summary = document.getElementById('previewSummary');
+            summary.innerHTML = `
+                <strong>Summary:</strong> 
+                ${validCount} valid rows, ${errorCount} error rows. 
+                ${validCount > 0 ? `${validCount} rows will be processed.` : 'No valid data to process.'}
+            `;
+
+            // Show/hide process button
+            const processBtn = document.getElementById('processValidBtn');
+            if (validCount > 0) {
+                processBtn.style.display = 'inline-block';
+                validBookings = allData.filter(item => item.isValid).map(item => ({
+                    Booking_ID: item.Booking_ID,
+                    Seats: item.Seats
+                }));
+            } else {
+                processBtn.style.display = 'none';
+            }
+
+            // Show preview section
+            document.getElementById('dataPreview').style.display = 'block';
+        }
+
+        function processUploadedFile() {
+            document.getElementById('error').innerText = '';
+            document.getElementById('error').style.color = 'red';
+            document.getElementById('resultTable').style.display = 'none';
+            document.getElementById('dataPreview').style.display = 'none';
+
+            if (!uploadedFileContent) {
+                document.getElementById('error').innerText = 'Please select and upload a file first.';
+                return;
+            }
+
+            try {
+                parsedData = parseCSVContent(uploadedFileContent);
+                parsedData = validateParsedData(parsedData);
+                displayDataPreview(parsedData);
+            } catch (error) {
+                document.getElementById('error').innerText = `File parsing error: ${error.message}`;
+            }
+        }
+
+        function processValidData() {
+            if (validBookings.length === 0) {
+                document.getElementById('error').innerText = 'No valid data to process.';
+                return;
+            }
+            processBookings(validBookings);
+        }
+
+        function processBookings(bookings) {
+            // Reset error display
+            document.getElementById('error').innerText = '';
+            document.getElementById('error').style.color = 'red';
+
+            // Send to backend
+            fetch('http://localhost:3000/boarding-sequence', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bookings)
+            })
+                .then(resp => resp.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('error').innerText = data.error;
+                        return;
+                    }
+                    // Render result table
+                    let tbody = document.querySelector('#resultTable tbody');
+                    tbody.innerHTML = '';
+                    data.forEach(row => {
+                        tbody.innerHTML += `<tr><td>${row.Seq}</td><td>${row.Booking_ID}</td></tr>`;
+                    });
+                    document.getElementById('resultTable').style.display = '';
+                    
+                    // Show success message
+                    document.getElementById('error').innerText = `Successfully processed ${bookings.length} bookings and generated boarding sequence.`;
+                    document.getElementById('error').style.color = 'green';
+                })
+                .catch(err => {
+                    document.getElementById('error').innerText = 'Could not connect to backend';
+                });
+        }
+
+        function submitData() {
+            document.getElementById('error').innerText = '';
+            document.getElementById('error').style.color = 'red';
+            document.getElementById('resultTable').style.display = 'none';
+
+            const raw = document.getElementById('inputData').value.trim();
+            if (!raw) {
+                document.getElementById('error').innerText = 'Please enter booking data!';
+                return;
+            }
+            
+            try {
+                const lines = raw.split('\n');
+                let bookings = [];
+                for (let line of lines) {
+                    let parts = line.split(',').map(s => s.trim());
+                    if (parts.length < 2) continue;
+                    let Booking_ID = parts[0];
+                    let Seats = parts.slice(1).filter(Boolean);
+                    bookings.push({ Booking_ID, Seats });
+                }
+
+                processBookings(bookings);
+            } catch (error) {
+                document.getElementById('error').innerText = `Input parsing error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+
+</html>
