@@ -32,27 +32,57 @@ The system sorts bookings based on:
 
 2. **Install dependencies**
    ```bash
-   npm install express cors
+   npm install
    ```
 
 3. **Start the server**
    ```bash
-   node server.js
+   npm start
+   # or for development with auto-restart
+   npm run dev
    ```
    You should see: `Server running on port 3000`
 
 4. **Open the application**
-   - Open `index.html` in your web browser
+   - Open `src/index.html` in your web browser
    - Or visit `http://localhost:3000` (if serving files)
 
 ## 📁 Project Structure
 
 ```
 bus-boarding-assignment/
-├── index.html          # Frontend application
-├── server.js          # Backend API server
-├── sample_data_*.csv  # Test CSV files
-└── README.md          # This file
+├── README.md                    # Project documentation
+├── package.json                 # Node.js dependencies and scripts
+├── .gitignore                   # Git ignore file
+│
+├── src/
+│   ├── index.html              # Main frontend application
+│   └── server.js               # Backend API server
+│
+├── assets/
+│   ├── css/
+│   │   └── styles.css          # Separated CSS styles
+│   └── js/
+│       └── app.js              # Separated JavaScript
+│
+├── data/
+│   └── samples/
+│       ├── sample_data_basic.csv
+│       ├── sample_data_advanced.csv
+│       ├── sample_data_large.csv
+│       ├── sample_data_semicolon.csv
+│       ├── sample_data_quoted.csv
+│       └── sample_data_errors.csv
+│
+├── docs/
+│   ├── API.md                  # API documentation
+│   └── VALIDATION_RULES.md     # Detailed validation rules
+│
+└── tests/
+    ├── test_data/
+    │   ├── valid_data.csv
+    │   └── invalid_data.csv
+    └── unit_tests.js           # Unit tests
 ```
 
 ## 📊 Input Format
@@ -89,6 +119,8 @@ Booking_ID,Seat1,Seat2,Seat3
 - Each booking must have at least one seat
 - No empty lines or malformed entries
 
+For detailed validation rules, see [docs/VALIDATION_RULES.md](docs/VALIDATION_RULES.md)
+
 ## 🎯 Usage Examples
 
 ### Example Input
@@ -109,30 +141,26 @@ Booking_ID,Seat1,Seat2,Seat3
 
 ## 🧪 Testing
 
-Use the provided sample files:
+Use the provided sample files in `data/samples/`:
 - `sample_data_basic.csv` - Basic valid data
 - `sample_data_advanced.csv` - Complex scenarios
 - `sample_data_large.csv` - Performance testing
 - `sample_data_errors.csv` - Error validation testing
 
-## 🔧 API Endpoints
-
-### POST `/boarding-sequence`
-**Request Body:**
-```json
-[
-  {"Booking_ID": "101", "Seats": ["A1", "B1"]},
-  {"Booking_ID": "102", "Seats": ["C25"]}
-]
+Run tests:
+```bash
+npm test
 ```
 
-**Response:**
-```json
-[
-  {"Seq": 1, "Booking_ID": "102"},
-  {"Seq": 2, "Booking_ID": "101"}
-]
-```
+## 🔧 API Documentation
+
+For detailed API documentation, see [docs/API.md](docs/API.md)
+
+### Quick API Reference
+**Endpoint**: `POST /boarding-sequence`
+
+**Request**: Array of booking objects
+**Response**: Array of sequence objects with Seq and Booking_ID
 
 ## 🚨 Error Handling
 
@@ -150,12 +178,26 @@ The system provides detailed error messages for:
 - **Error details**: Specific error messages per row
 - **Partial processing**: Continue with valid data only
 - **File upload feedback**: Clear status messages
+- **Responsive design**: Works on desktop and mobile devices
+
+## 🛠️ Development
+
+### Available Scripts
+- `npm start` - Start the production server
+- `npm run dev` - Start development server with auto-restart
+- `npm test` - Run unit tests
+
+### Adding New Features
+1. Update validation rules in both frontend and backend
+2. Add corresponding tests
+3. Update documentation
 
 ## 🤝 Contributing
 
 1. Ensure all validation rules are maintained
 2. Test with both valid and invalid data
 3. Update documentation for any new features
+4. Follow the established code structure
 
 ## 📄 License
 
