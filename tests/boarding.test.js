@@ -1,4 +1,4 @@
-const { getBoardingSequence } = require("./boarding");
+const { getBoardingSequence } = require("../boarding");
 
 // Success case
 test("returns correct sequence for valid input", () => {
