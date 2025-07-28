@@ -1,0 +1,11 @@
+# Invalid Booking_ID (contains special characters)
+101@#,A1,B1
+# Duplicate Booking_ID
+102,C15,A10
+102,D20,E20
+# Invalid seat format
+103,1A,B5
+# Duplicate seat
+104,A5,A5
+# Row number out of range
+105,A50,B50
